@@ -1,4 +1,4 @@
-name: Build CrystalDump
+name: Cross-Compile for Windows
 
 on:
   push:
@@ -7,42 +7,31 @@ on:
   pull_request:
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        crystal: [latest]
-
-    runs-on: ${{ matrix.os }}
+  build-windows:
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install dependencies (Cross-compilation)
+        run: |
+          sudo apt update
+          sudo apt install -y mingw-w64
+          sudo apt install -y libz-mingw-w64-dev libxml2-mingw-w64-dev libyaml-mingw-w64-dev
+
       - name: Install Crystal
         uses: crystal-lang/install-crystal@v1
         with:
-          crystal: ${{ matrix.crystal }}
+          crystal: latest
 
-      - name: Install dependencies
-        run: shards install
-
-      - name: Compile CrystalDump (Linux/macOS)
-        if: runner.os != 'Windows'
+      - name: Cross-Compile for Windows
         run: |
           mkdir -p build
-          crystal build crystaldump.cr --release --static -o build/crystaldump
-        shell: bash
+          crystal build crystaldump.cr --release --cross-target x86_64-w64-mingw32 -o build/crystaldump.exe
 
-      - name: Compile CrystalDump (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          mkdir build
-          crystal build crystaldump.cr --release -o build/crystaldump.exe
-
-      - name: Upload built executable
+      - name: Upload Windows executable
         uses: actions/upload-artifact@v3
         with:
-          name: crystaldump-${{ runner.os }}
-          path: build/crystaldump*
+          name: crystaldump-windows
+          path: build/crystaldump.exe
