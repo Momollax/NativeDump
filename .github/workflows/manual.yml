@@ -31,7 +31,7 @@ jobs:
           crystal build crystaldump.cr --release --cross-target x86_64-w64-mingw32 -o build/crystaldump.exe
 
       - name: Upload Windows executable
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: crystaldump-windows
           path: build/crystaldump.exe
