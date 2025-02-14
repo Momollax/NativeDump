@@ -1,37 +1,83 @@
-name: Cross-Compile for Windows on branche crystal
+name: Build and Test
 
 on:
   push:
-    branches:
-      - crystal-flavour
   pull_request:
 
 jobs:
-  build-windows:
-    runs-on: ubuntu-latest
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu", "macos", "windows"]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Install dependencies (Cross-compilation)
-        run: |
-          sudo apt update
-          sudo apt install -y mingw-w64
-          sudo apt install -y libz-mingw-w64-dev libxml2-mingw-w64-dev libyaml-mingw-w64-dev
+        with:
+          submodules: true
 
       - name: Install Crystal
         uses: crystal-lang/install-crystal@v1
         with:
           crystal: latest
 
-      - name: Cross-Compile for Windows
+      - name: Install dependencies
+        run: shards install --without-development --release
+
+      - name: Run tests
+        run: crystal spec
+
+      - name: Build executable
         run: |
-          mkdir -p build
-          crystal build crystaldump.cr --release --cross-target x86_64-w64-mingw32 -o build/crystaldump.exe
+          shards build --release
+          # Si votre fichier principal n'est pas dans src ou a un nom différent, spécifiez-le :
+          # crystal build path/to/your/crystaldump.cr --release
+
+      - name: Run executable (help)
+        run: |
+          ./bin/crystaldump --help
+          # Sur Windows, utilisez :
+          # .\bin\crystaldump.exe --help
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: crystaldump-${{ matrix.os }}
+          path: |
+            bin/crystaldump
+            # Sur Windows, ajoutez :
+            # bin/crystaldump.exe
+
+  cross-compile-windows:
+    name: Cross-Compile for Windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y mingw-w64 llvm llvm-dev libxml2-dev libyaml-dev
+
+      - name: Install Crystal
+        uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: latest
+
+      - name: Cross-compile for Windows
+        run: |
+          shards install --without-development --release
+          crystal build ./crystaldump.cr --release --cross-target x86_64-w64-mingw32
+          # Assurez-vous que le chemin vers crystaldump.cr est correct
 
       - name: Upload Windows executable
         uses: actions/upload-artifact@v4
         with:
           name: crystaldump-windows
-          path: build/crystaldump.exe
+          path: crystaldump.exe
