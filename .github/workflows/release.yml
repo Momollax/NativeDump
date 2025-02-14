@@ -34,8 +34,28 @@ jobs:
           eval $LINK_CMD -o bin/CrystalDump.exe
           zip bin/CrystalDump-windows.zip bin/CrystalDump.exe
 
-      - name: Upload Windows executable to GitHub Releases
-        uses: softprops/action-gh-release@v2
+      - name: Upload Windows executable as artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: bin/CrystalDump-windows.zip
-          token: ${{ secrets.GITHUB_TOKEN }}
+          name: CrystalDump-windows
+          path: bin/CrystalDump.exe
+
+  test-windows:
+    name: Test Windows Executable
+    needs: build-windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Download compiled Windows executable
+        uses: actions/download-artifact@v4
+        with:
+          name: CrystalDump-windows
+          path: bin
+
+      - name: Verify executable presence
+        run: |
+          if (Test-Path "bin/CrystalDump.exe") { echo "Executable found" } else { echo "Executable NOT found"; exit 1 }
+
+      - name: Run CrystalDump.exe
+        run: |
+          .\bin\CrystalDump.exe --help
