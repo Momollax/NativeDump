@@ -1,7 +1,7 @@
 require "option_parser"
 
-
-# Functions
+# 
+# Functions !
 @[Link("ntdll")]
 lib Ntdll
   struct OSVERSIONINFOEXW
