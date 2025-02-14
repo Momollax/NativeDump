@@ -1,2 +1,6 @@
 name: CrystalDump
 version: 0.1.0
+
+targets:
+  CrystalDump:
+    main: crystaldump.cr

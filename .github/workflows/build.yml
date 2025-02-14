@@ -1,0 +1,40 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu", "macos", "windows"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Crystal
+        uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: latest
+
+      - name: Install dependencies
+        run: shards install --without-development --release
+
+      - name: Build executable
+        run: shards build --release
+
+      - name: Run executable (help)
+        run: bin/CrystalDump --help
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CrystalDump-${{ matrix.os }}
+          path: bin/${{ matrix.os == 'windows' && 'CrystalDump.exe' || 'CrystalDump' }}
