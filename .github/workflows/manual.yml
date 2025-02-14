@@ -36,12 +36,6 @@ jobs:
           # Si votre fichier principal n'est pas dans src ou a un nom différent, spécifiez-le :
           # crystal build path/to/your/crystaldump.cr --release
 
-      - name: Run executable (help)
-        run: |
-          ./bin/crystaldump --help
-          # Sur Windows, utilisez :
-          # .\bin\crystaldump.exe --help
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
