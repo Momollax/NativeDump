@@ -2,19 +2,18 @@ name: build
 
 on:
   push:
-  pull_request:
+    tags:
+      - "v*"
 
 jobs:
-  build:
-    name: ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}-latest
+  build_release:
+    name: Build Release ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
-        os: ["windows"]
-
+        os: [ubuntu, macos, windows]
+    runs-on: ${{ matrix.os }}-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           submodules: true
@@ -24,17 +23,40 @@ jobs:
         with:
           crystal: latest
 
-      - name: Install dependencies
-        run: shards install --without-development --release
+      - name: Run Linux Build
+        if: matrix.os == 'ubuntu'
+        run: |
+          mkdir -p bin
+          chmod 755 bin
+          docker run -d --name alpine -v $(pwd):/workspace -w /workspace crystallang/crystal:latest-alpine tail -f /dev/null
+          docker exec alpine shards install --without-development --release --static
+          docker exec alpine shards build --release --static
+          docker exec alpine chmod +x bin/CrystalDump
+          docker exec alpine gzip bin/CrystalDump
+          docker exec alpine mv bin/CrystalDump.gz bin/CrystalDump-linux.gz
 
-      - name: Build executable
-        run: shards build --release
+      - name: Run Mac Build x64
+        if: matrix.os == 'macos'
+        run: |
+          shards install --without-development --release
+          shards build --release
+          chmod +x bin/CrystalDump
+          gzip bin/CrystalDump
+          mv bin/CrystalDump.gz bin/CrystalDump-macos.gz
 
-      - name: Run executable (help)
-        run: bin/CrystalDump --help
+      - name: Run Windows Build x64
+        if: matrix.os == 'windows'
+        run: |
+          shards install --without-development --release
+          shards build --release --static
+          Set-ExecutionPolicy RemoteSigned -Scope Process
+          Compress-Archive -Path bin/CrystalDump.exe -DestinationPath bin/CrystalDump-windows.zip
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
         with:
-          name: CrystalDump-${{ matrix.os }}
-          path: bin/${{ matrix.os == 'windows' && 'CrystalDump.exe' || 'CrystalDump' }}
+          files: |
+            bin/CrystalDump-linux.gz
+            bin/CrystalDump-macos.gz
+            bin/CrystalDump-windows.zip
+            LICENSE.txt
