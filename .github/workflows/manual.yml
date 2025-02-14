@@ -1,54 +1,32 @@
-name: Build and Test
+name: Build Windows Executable
 
 on:
   push:
   pull_request:
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ["ubuntu", "macos", "windows"]
+  build-windows:
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: true
+
+      - name: Install dependencies (Cross-compilation)
+        run: |
+          sudo apt update
+          sudo apt install -y mingw-w64
+          sudo apt install -y libz-mingw-w64-dev libxml2-mingw-w64-dev libyaml-mingw-w64-dev
 
       - name: Install Crystal
         uses: crystal-lang/install-crystal@v1
         with:
           crystal: latest
 
-      - name: Install dependencies
-        run: shards install --without-development --release
-
-      - name: Run tests
-        run: crystal spec
-
-      - name: Build executable
-        run: |
-          shards build --release
-          # Si votre fichier principal n'est pas dans src ou a un nom différent, spécifiez-le :
-          # crystal build path/to/your/crystaldump.cr --release
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: crystaldump-${{ matrix.os }}
-          path: |
-            bin/crystaldump
-            # Sur Windows, ajoutez :
-            # bin/crystaldump.exe
-
       - name: Cross-Compile for Windows (Generate Object Files)
         run: |
           mkdir -p build
-          crystal build crystaldump.cr --cross-compile --target x86_64-pc-win32 > build/compile_output.txt
+          crystal build crystaldump.cr --release --cross-compile --target x86_64-pc-win32 > build/compile_output.txt
         shell: bash
 
       - name: Extract Compilation Command
