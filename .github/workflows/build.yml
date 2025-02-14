@@ -1,19 +1,23 @@
-name: build
+name: release
 
 on:
   push:
     tags:
       - "v*"
+  pull_request:
+
 
 jobs:
-  build_release:
-    name: Build Release ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu, macos, windows]
+  build:
+    name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["windows"]
+
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: true
@@ -23,26 +27,8 @@ jobs:
         with:
           crystal: latest
 
-      - name: Run Linux Build
-        if: matrix.os == 'ubuntu'
-        run: |
-          mkdir -p bin
-          chmod 755 bin
-          docker run -d --name alpine -v $(pwd):/workspace -w /workspace crystallang/crystal:latest-alpine tail -f /dev/null
-          docker exec alpine shards install --without-development --release --static
-          docker exec alpine shards build --release --static
-          docker exec alpine chmod +x bin/CrystalDump
-          docker exec alpine gzip bin/CrystalDump
-          docker exec alpine mv bin/CrystalDump.gz bin/CrystalDump-linux.gz
-
-      - name: Run Mac Build x64
-        if: matrix.os == 'macos'
-        run: |
-          shards install --without-development --release
-          shards build --release
-          chmod +x bin/CrystalDump
-          gzip bin/CrystalDump
-          mv bin/CrystalDump.gz bin/CrystalDump-macos.gz
+      - name: Install dependencies
+        run: shards install --without-development --release
 
       - name: Run Windows Build x64
         if: matrix.os == 'windows'
