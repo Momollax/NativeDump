@@ -1,4 +1,4 @@
-name: release-windows
+name: release
 
 on:
   push:
@@ -6,56 +6,57 @@ on:
       - "v*"
 
 jobs:
-  build-windows:
-    name: Build Windows Executable
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-
+  build_release:
+    name: Build Release ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu, macos, windows]
+    runs-on: ${{ matrix.os }}-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Install dependencies (Cross-compilation)
-        run: |
-          sudo apt update
-          sudo apt install -y mingw-w64
+        with:
+          submodules: true
 
       - name: Install Crystal
         uses: crystal-lang/install-crystal@v1
         with:
           crystal: latest
 
-      - name: Cross-Compile for Windows
+      - name: Run Linux Build
+        if: matrix.os == 'ubuntu'
         run: |
           mkdir -p bin
-          crystal build crystaldump.cr --release --cross-compile --target x86_64-pc-win32 > bin/compile_output.txt
-          LINK_CMD=$(tail -n 1 bin/compile_output.txt)
-          eval $LINK_CMD -o bin/CrystalDump.exe
-          zip bin/CrystalDump-windows.zip bin/CrystalDump.exe
+          chmod 755 bin
+          docker run -d --name alpine -v $(pwd):/workspace -w /workspace crystallang/crystal:latest-alpine tail -f /dev/null
+          docker exec alpine shards install --without-development --release --static
+          docker exec alpine shards build --release --static
+          docker exec alpine chmod +x bin/CrystalDump
+          docker exec alpine gzip bin/CrystalDump
+          docker exec alpine mv bin/CrystalDump.gz bin/CrystalDump-linux.gz
 
-      - name: Upload Windows executable as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: CrystalDump-windows
-          path: bin/CrystalDump.exe
-
-  test-windows:
-    name: Test Windows Executable
-    needs: build-windows
-    runs-on: windows-latest
-
-    steps:
-      - name: Download compiled Windows executable
-        uses: actions/download-artifact@v4
-        with:
-          name: CrystalDump-windows
-          path: bin
-
-      - name: Verify executable presence
+      - name: Run Mac Build x64
+        if: matrix.os == 'macos'
         run: |
-          if (Test-Path "bin/CrystalDump.exe") { echo "Executable found" } else { echo "Executable NOT found"; exit 1 }
+          shards install --without-development --release
+          shards build --release
+          chmod +x bin/CrystalDump
+          gzip bin/CrystalDump
+          mv bin/CrystalDump.gz bin/CrystalDump-macos.gz
 
-      - name: Run CrystalDump.exe
+      - name: Run Windows Build x64
+        if: matrix.os == 'windows'
         run: |
-          .\bin\CrystalDump.exe --help
+          shards install --without-development --release
+          shards build --release --static
+          Set-ExecutionPolicy RemoteSigned -Scope Process
+          Compress-Archive -Path bin/CrystalDump.exe -DestinationPath bin/CrystalDump-windows.zip
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            bin/CrystalDump-linux.gz
+            bin/CrystalDump-macos.gz
+            bin/CrystalDump-windows.zip
+            LICENSE.txt
